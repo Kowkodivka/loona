@@ -81,7 +81,7 @@ async fn channel(ctx: Context<'_>, value: ChannelId) -> anyhow::Result<()> {
     active.channel_id = Set(Some(value.get() as i64));
     active.update(&ctx.data().db_conn).await?;
 
-    ctx.say(format!("Канал установлен: <#{value}>")).await?;
+    ctx.say(format!("Channel set: <#{value}>")).await?;
 
     Ok(())
 }
