@@ -1,0 +1,8 @@
+services:
+  loona:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./data:/home/loona
+    restart: unless-stopped
