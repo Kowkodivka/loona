@@ -20,7 +20,7 @@ struct Data {
     db_conn: DatabaseConnection,
 }
 
-const CONFIG_PATH: &'static str = "config.toml";
+const CONFIG_PATH: &'static str = "data/config.toml";
 
 // TODO: сделать систему перевода
 
