@@ -52,7 +52,7 @@ pub fn apply_translations(
     }
 
     info!(
-        "applying translations: {} command(s), fallback '{fallback_lang}', {} other locale(s)",
+        "Applying translations: {} command(s), fallback '{fallback_lang}', {} other locale(s)",
         commands.len(),
         other_langs.len()
     );
