@@ -1,8 +1,8 @@
 use std::{borrow::Cow, collections::HashMap};
 
 use fluent_bundle::FluentValue;
-use fluent_templates::{Loader, StaticLoader};
-use tracing::{debug, warn};
+use fluent_templates::{LanguageIdentifier, Loader, StaticLoader};
+use tracing::{debug, info, warn};
 
 use crate::{Context, Data};
 
@@ -41,124 +41,138 @@ pub fn lookup_ctx(
 }
 
 pub fn apply_translations(
-    locales: &StaticLoader,
+    loader: &StaticLoader,
     commands: &mut [poise::Command<Data, anyhow::Error>],
 ) {
-    debug!("Applying translations for {} command(s)", commands.len());
-    apply_translations_recursive(locales, commands, None);
+    let fallback_lang = loader.fallback();
+    let other_langs: Vec<_> = loader.locales().filter(|&l| l != fallback_lang).collect();
+
+    if other_langs.is_empty() {
+        warn!("no locales besides fallback '{fallback_lang}' - localizations will be empty");
+    }
+
+    info!(
+        "applying translations: {} command(s), fallback '{fallback_lang}', {} other locale(s)",
+        commands.len(),
+        other_langs.len()
+    );
+
+    apply_translations_recursive(loader, fallback_lang, &other_langs, commands, None);
 }
 
-// TODO: rewrite
+fn localize(
+    loader: &StaticLoader,
+    fallback_lang: &LanguageIdentifier,
+    other_langs: &[&LanguageIdentifier],
+    key: &str,
+    localizations: &mut HashMap<String, String>,
+) -> Option<String> {
+    for &lang in other_langs {
+        match loader.try_lookup(lang, key) {
+            Some(x) => {
+                localizations.insert(lang.to_string(), x);
+            }
+            None => debug!("no '{lang}' translation for '{key}'"),
+        }
+    }
+
+    loader.try_lookup(fallback_lang, key)
+}
+
 fn apply_translations_recursive(
-    locales: &StaticLoader,
+    loader: &StaticLoader,
+    fallback_lang: &LanguageIdentifier,
+    other_langs: &[&LanguageIdentifier],
     commands: &mut [poise::Command<Data, anyhow::Error>],
     parent_key: Option<&str>,
 ) {
-    let fallback_lang = locales.fallback();
-    let other_langs: Vec<_> = locales
-        .locales()
-        .filter(|&lang| lang != fallback_lang)
-        .cloned()
-        .collect();
-
-    match parent_key {
-        Some(parent) => debug!("Translating subcommands for '{}'...", parent),
-        None => debug!(
-            "Language setup: fallback is '{}', translating to: {:?}",
-            fallback_lang, other_langs
-        ),
-    }
-
     for command in commands {
         let base_key = match parent_key {
-            Some(parent) => format!("{}-{}", parent, command.name),
+            Some(parent) => format!("{parent}-{}", command.name),
             None => command.name.clone(),
         };
 
-        let Some(translated_name) = locales.try_lookup(fallback_lang, &base_key) else {
-            warn!(
-                "Skipping command '{}': missing base translation for key '{}'",
-                command.name, base_key
-            );
+        let Some(name) = localize(
+            loader,
+            fallback_lang,
+            other_langs,
+            &base_key,
+            &mut command.name_localizations,
+        ) else {
+            warn!("no fallback translation for command '{base_key}', skipping");
             continue;
         };
 
-        debug!("Command '{}':", command.name);
+        let description_key = format!("{base_key}.description");
+        command.description = localize(
+            loader,
+            fallback_lang,
+            other_langs,
+            &description_key,
+            &mut command.description_localizations,
+        );
 
-        let description_key = format!("{}.description", base_key);
-
-        if let Some(x) = locales.try_lookup(fallback_lang, &description_key) {
-            command.description = Some(x);
-        }
-
-        for lang in &other_langs {
-            if let Some(x) = locales.try_lookup(lang, &base_key) {
-                debug!("Translated name to '{}'", lang);
-                command.name_localizations.insert(lang.to_string(), x);
-            }
-
-            if let Some(x) = locales.try_lookup(lang, &description_key) {
-                debug!("Translated description to '{}'", lang);
-                command
-                    .description_localizations
-                    .insert(lang.to_string(), x);
-            }
+        if command.description.is_none() {
+            warn!("command '{base_key}' has a name but no description ('{description_key}')");
         }
 
         for parameter in &mut command.parameters {
-            let key = format!("{}.{}", base_key, parameter.name);
+            let key = format!("{base_key}.{}", parameter.name);
             let description_key = format!("{key}-description");
 
-            debug!("Parameter '{}':", parameter.name);
-
-            if let Some(x) = locales.try_lookup(fallback_lang, &description_key) {
-                parameter.description = Some(x);
+            if let Some(x) = localize(
+                loader,
+                fallback_lang,
+                other_langs,
+                &key,
+                &mut parameter.name_localizations,
+            ) {
+                parameter.name = x;
+            } else {
+                warn!("no fallback translation for parameter '{key}'");
             }
 
-            for lang in &other_langs {
-                if let Some(x) = locales.try_lookup(lang, &key) {
-                    debug!("Translated name to '{}'", lang);
-                    parameter.name_localizations.insert(lang.to_string(), x);
-                }
+            parameter.description = localize(
+                loader,
+                fallback_lang,
+                other_langs,
+                &description_key,
+                &mut parameter.description_localizations,
+            );
 
-                if let Some(x) = locales.try_lookup(lang, &description_key) {
-                    debug!("Translated description to '{}'", lang);
-                    parameter
-                        .description_localizations
-                        .insert(lang.to_string(), x);
-                }
+            if parameter.description.is_none() {
+                warn!("parameter '{key}' has a name but no description ('{description_key}')");
             }
 
             for choice in &mut parameter.choices {
                 let choice_key = format!("{key}-{}", choice.name);
 
-                for lang in &other_langs {
-                    if let Some(x) = locales.try_lookup(lang, &choice_key) {
-                        debug!("Translated choice '{}' to '{}'", choice.name, lang);
-                        choice.localizations.insert(lang.to_string(), x);
-                    }
-                }
-
-                if let Some(x) = locales.try_lookup(fallback_lang, &choice_key) {
+                if let Some(x) = localize(
+                    loader,
+                    fallback_lang,
+                    other_langs,
+                    &choice_key,
+                    &mut choice.localizations,
+                ) {
                     choice.name = x;
+                } else {
+                    warn!("no fallback translation for choice '{choice_key}'");
                 }
-            }
-
-            if let Some(x) = locales.try_lookup(fallback_lang, &key) {
-                parameter.name = x;
             }
         }
 
         if !command.subcommands.is_empty() {
-            debug!(
-                "Found {} subcommand(s) for '{}'",
-                command.subcommands.len(),
-                command.name
+            apply_translations_recursive(
+                loader,
+                fallback_lang,
+                other_langs,
+                &mut command.subcommands,
+                Some(&base_key),
             );
         }
 
-        apply_translations_recursive(locales, &mut command.subcommands, Some(&base_key));
+        command.name = name;
 
-        command.name = translated_name;
+        debug!("translated command '{base_key}'");
     }
 }
