@@ -2,10 +2,12 @@ mod commands;
 mod config;
 mod entities;
 mod handlers;
+mod translation;
 mod utils;
 
+use fluent_templates::static_loader;
 use migration::{Migrator, MigratorTrait};
-use poise::{Framework, FrameworkOptions, serenity_prelude::*};
+use poise::{Framework, FrameworkOptions, PrefixFrameworkOptions, serenity_prelude::*};
 use sea_orm::{Database, DatabaseConnection};
 use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
@@ -22,7 +24,14 @@ struct Data {
 
 const CONFIG_PATH: &'static str = "data/config.toml";
 
-// TODO: сделать систему перевода
+static_loader! {
+    static LOCALES = {
+        locales: "./locales",
+        fallback_language: "en-US"
+    };
+}
+
+// TODO: добавить help команду
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -38,12 +47,18 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let db_conn = Database::connect(&config.database.url).await?;
-
     Migrator::up(&db_conn, None).await?;
+
+    let mut commands = vec![commands::starboard::starboard()];
+    translation::apply_translations(&LOCALES, &mut commands);
 
     let framework = Framework::builder()
         .options(FrameworkOptions {
-            commands: vec![commands::starboard::starboard()],
+            prefix_options: PrefixFrameworkOptions {
+                prefix: Some("l!".to_owned()),
+                ..Default::default()
+            },
+            commands,
             event_handler: |ctx, event, framework, data| {
                 Box::pin(async move {
                     handlers::starboard::handle_event(ctx, event, framework, data).await

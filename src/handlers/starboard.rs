@@ -8,7 +8,7 @@ use crate::{
     utils::starboard::get_or_default,
 };
 
-// TODO: сделать стиль как у Juniper
+// TODO: сделать стиль как у Carl'а
 // TODO: игнорировать ботов
 
 pub async fn handle_event(
