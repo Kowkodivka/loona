@@ -48,7 +48,7 @@ pub fn apply_translations(
     let other_langs: Vec<_> = loader.locales().filter(|&l| l != fallback_lang).collect();
 
     if other_langs.is_empty() {
-        warn!("no locales besides fallback '{fallback_lang}' - localizations will be empty");
+        warn!("No locales besides fallback '{fallback_lang}' - localizations will be empty");
     }
 
     info!(
@@ -99,7 +99,7 @@ fn apply_translations_recursive(
             &base_key,
             &mut command.name_localizations,
         ) else {
-            warn!("no fallback translation for command '{base_key}', skipping");
+            warn!("No fallback translation for command '{base_key}', skipping");
             continue;
         };
 
@@ -113,7 +113,7 @@ fn apply_translations_recursive(
         );
 
         if command.description.is_none() {
-            warn!("command '{base_key}' has a name but no description ('{description_key}')");
+            warn!("Command '{base_key}' has a name but no description ('{description_key}')");
         }
 
         for parameter in &mut command.parameters {
@@ -129,7 +129,7 @@ fn apply_translations_recursive(
             ) {
                 parameter.name = x;
             } else {
-                warn!("no fallback translation for parameter '{key}'");
+                warn!("No fallback translation for parameter '{key}'");
             }
 
             parameter.description = localize(
@@ -141,7 +141,7 @@ fn apply_translations_recursive(
             );
 
             if parameter.description.is_none() {
-                warn!("parameter '{key}' has a name but no description ('{description_key}')");
+                warn!("Parameter '{key}' has a name but no description ('{description_key}')");
             }
 
             for choice in &mut parameter.choices {
@@ -156,7 +156,7 @@ fn apply_translations_recursive(
                 ) {
                     choice.name = x;
                 } else {
-                    warn!("no fallback translation for choice '{choice_key}'");
+                    warn!("No fallback translation for choice '{choice_key}'");
                 }
             }
         }
