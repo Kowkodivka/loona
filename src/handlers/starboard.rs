@@ -10,6 +10,7 @@ use crate::{
 
 // TODO: сделать стиль как у Carl'а
 // TODO: игнорировать ботов
+// TODO: отслеживать изменение или удаление сообщений
 
 pub async fn handle_event(
     ctx: &Context,
