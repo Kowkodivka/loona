@@ -32,6 +32,7 @@ static_loader! {
 }
 
 // TODO: добавить help команду
+// TODO: добавить настройки языка для отдельного пользователя
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
