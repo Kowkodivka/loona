@@ -9,7 +9,7 @@ use fluent_templates::static_loader;
 use migration::{Migrator, MigratorTrait};
 use poise::{Framework, FrameworkOptions, PrefixFrameworkOptions, serenity_prelude::*};
 use sea_orm::{Database, DatabaseConnection};
-use tracing::{info, warn};
+use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 use crate::config::Config;
@@ -22,7 +22,7 @@ struct Data {
     db_conn: DatabaseConnection,
 }
 
-const CONFIG_PATH: &'static str = "data/config.toml";
+const CONFIG_PATH: &'static str = "config.toml";
 
 static_loader! {
     static LOCALES = {
@@ -39,12 +39,7 @@ async fn main() -> anyhow::Result<()> {
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or(EnvFilter::from("info")))
         .init();
 
-    let Some(config) = Config::load_or_init(CONFIG_PATH).await? else {
-        warn!("Generated a new configuration file at {CONFIG_PATH}");
-        warn!("Please review it and fill in the required fields before restarting");
-
-        return Ok(());
-    };
+    let config = Config::load(CONFIG_PATH).await?;
 
     let db_conn = Database::connect(&config.database.url).await?;
     Migrator::up(&db_conn, None).await?;

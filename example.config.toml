@@ -1,0 +1,5 @@
+[database]
+url = "sqlite://settings.sqlite?mode=rwc"
+
+[discord]
+token = "YOUR_TOKEN_HERE"
